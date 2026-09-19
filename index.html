@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cloud File Manager | MongoDB GridFS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --primary: #4f46e5;
+      --primary-hover: #4338ca;
+      --success: #10b981;
+      --success-hover: #059669;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --radius: 12px;
+      --shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 40px 20px;
+      min-height: 100vh;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    header {
+      margin-bottom: 28px;
+    }
+
+    h1 {
+      font-size: 26px;
+      font-weight: 700;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+    }
+
+    p.subtitle {
+      color: var(--text-muted);
+      font-size: 14px;
+      margin-top: 4px;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .card-header h2 {
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    /* Drag and Drop Zone */
+    .dropzone {
+      border: 2px dashed #cbd5e1;
+      border-radius: var(--radius);
+      padding: 32px 20px;
+      text-align: center;
+      background: #f1f5f9;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+
+    .dropzone.dragover {
+      border-color: var(--primary);
+      background: #eef2ff;
+    }
+
+    .dropzone svg {
+      width: 44px;
+      height: 44px;
+      color: var(--primary);
+      margin-bottom: 10px;
+    }
+
+    .dropzone p {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text-main);
+    }
+
+    .dropzone span {
+      font-size: 12px;
+      color: var(--text-muted);
+      display: block;
+      margin-top: 4px;
+    }
+
+    #fileInput {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      cursor: pointer;
+    }
+
+    .selected-file-badge {
+      display: none;
+      margin-top: 14px;
+      padding: 8px 14px;
+      background: #e0e7ff;
+      color: var(--primary);
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      text-align: center;
+      word-break: break-all;
+    }
+
+    /* Action Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 9px 18px;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .btn-primary {
+      background-color: var(--primary);
+      color: #ffffff;
+      width: 100%;
+      margin-top: 16px;
+      padding: 12px;
+    }
+    .btn-primary:hover { background-color: var(--primary-hover); }
+
+    .btn-secondary {
+      background-color: #f1f5f9;
+      color: var(--text-main);
+      border: 1px solid var(--border);
+    }
+    .btn-secondary:hover { background-color: #e2e8f0; }
+
+    .btn-icon {
+      width: 14px;
+      height: 14px;
+    }
+
+    .btn-view {
+      background-color: var(--success);
+      color: #ffffff;
+      font-size: 13px;
+      padding: 8px 14px;
+    }
+    .btn-view:hover { background-color: var(--success-hover); }
+
+    .btn-delete {
+      background-color: var(--danger);
+      color: #ffffff;
+      font-size: 13px;
+      padding: 8px 14px;
+    }
+    .btn-delete:hover { background-color: var(--danger-hover); }
+
+    /* File List */
+    ul.file-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    li.file-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 14px 18px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      background: #fafafa;
+      transition: all 0.2s ease;
+    }
+
+    li.file-item:hover {
+      background: #ffffff;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.04);
+      border-color: #cbd5e1;
+    }
+
+    .file-details {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      max-width: 60%;
+    }
+
+    .file-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--text-main);
+      word-break: break-all;
+    }
+
+    .file-meta {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 2px 8px;
+      border-radius: 6px;
+      font-size: 11px;
+      font-weight: 600;
+      background: #e2e8f0;
+      color: #334155;
+      text-transform: uppercase;
+    }
+
+    .file-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+
+    /* Status Notifications */
+    .status-alert {
+      display: none;
+      margin-top: 14px;
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 500;
+    }
+    .status-alert.success {
+      display: block;
+      background: #d1fae5;
+      color: #065f46;
+      border: 1px solid #a7f3d0;
+    }
+    .status-alert.error {
+      display: block;
+      background: #fee2e2;
+      color: #991b1b;
+      border: 1px solid #fecaca;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 36px 0;
+      color: var(--text-muted);
+      font-size: 14px;
+    }
+
+    .empty-state-error {
+      color: var(--danger);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>File Upload Manager</h1>
+      <p class="subtitle">Securely stream, upload, and manage binary chunks in MongoDB</p>
+    </header>
+
+    <!-- Upload Card -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Upload Document</h2>
+      </div>
+
+      <form id="uploadForm">
+        <div class="dropzone" id="dropArea">
+          <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"></path>
+          </svg>
+          <p>Drag and drop your file here, or browse</p>
+          <span>Supported: PDF, Images, Word, Text (Up to 15MB)</span>
+          <input type="file" id="fileInput" name="file" aria-label="Upload file to GridFS" />
+        </div>
+
+        <div id="selectedFileBadge" class="selected-file-badge"></div>
+
+        <button type="submit" class="btn btn-primary" id="uploadBtn">
+          Upload to Database
+        </button>
+      </form>
+
+      <div id="uploadStatus" class="status-alert"></div>
+    </div>
+
+    <!-- Storage Card -->
+    <div class="card">
+      <div class="card-header">
+        <h2>Stored Files</h2>
+        <button type="button" class="btn btn-secondary" onclick="loadFiles()">
+          <svg class="btn-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path>
+          </svg>
+          Refresh
+        </button>
+      </div>
+
+      <ul id="filesList" class="file-list"></ul>
+    </div>
+  </div>
+
+  <script>
+    const form = document.getElementById('uploadForm');
+    const fileInput = document.getElementById('fileInput');
+    const dropArea = document.getElementById('dropArea');
+    const selectedBadge = document.getElementById('selectedFileBadge');
+    const uploadStatus = document.getElementById('uploadStatus');
+    const filesList = document.getElementById('filesList');
+    const uploadBtn = document.getElementById('uploadBtn');
+
+    // Drag-and-drop feedback
+    ['dragenter', 'dragover'].forEach(eventName => {
+      dropArea.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropArea.classList.add('dragover');
+      }, false);
+    });
+
+    ['dragleave', 'drop'].forEach(eventName => {
+      dropArea.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        dropArea.classList.remove('dragover');
+      }, false);
+    });
+
+    // File selection UI update
+    fileInput.addEventListener('change', () => {
+      if (fileInput.files.length > 0) {
+        const file = fileInput.files[0];
+        selectedBadge.textContent = `Selected: ${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+        selectedBadge.style.display = 'block';
+      } else {
+        selectedBadge.style.display = 'none';
+      }
+    });
+
+    // Submit handler
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!fileInput.files || fileInput.files.length === 0) {
+        showStatus('Please choose a file before uploading.', 'error');
+        return;
+      }
+
+      const formData = new FormData();
+      formData.append('file', fileInput.files[0]);
+
+      uploadBtn.disabled = true;
+      uploadBtn.textContent = 'Uploading...';
+      uploadStatus.style.display = 'none';
+
+      try {
+        const res = await fetch('/api/files/upload', {
+          method: 'POST',
+          body: formData
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          showStatus('File successfully uploaded to MongoDB GridFS!', 'success');
+          fileInput.value = '';
+          selectedBadge.style.display = 'none';
+          loadFiles();
+        } else {
+          showStatus(data.message || 'Upload failed', 'error');
+        }
+      } catch (err) {
+        showStatus('Network error while connecting to server.', 'error');
+      } finally {
+        uploadBtn.disabled = false;
+        uploadBtn.textContent = 'Upload to Database';
+      }
+    });
+
+    function showStatus(message, type) {
+      uploadStatus.className = `status-alert ${type}`;
+      uploadStatus.textContent = message;
+    }
+
+    async function loadFiles() {
+      filesList.innerHTML = '<li class="empty-state">Loading documents...</li>';
+
+      try {
+        const res = await fetch('/api/files');
+        const data = await res.json();
+
+        filesList.innerHTML = '';
+
+        if (!data.files || data.files.length === 0) {
+          filesList.innerHTML = '<li class="empty-state">No files stored in MongoDB GridFS yet.</li>';
+          return;
+        }
+
+        data.files.forEach(file => {
+          const sizeKb = file.length ? (file.length / 1024).toFixed(1) : '0';
+          const extension = file.filename.split('.').pop() || 'FILE';
+          const li = document.createElement('li');
+          li.className = 'file-item';
+
+          li.innerHTML = `
+            <div class="file-details">
+              <span class="file-title" title="${file.filename}">${file.filename}</span>
+              <div class="file-meta">
+                <span class="badge">${extension}</span>
+                <span>${sizeKb} KB</span>
+                <span>•</span>
+                <span>${file.uploadDate ? new Date(file.uploadDate).toLocaleDateString() : 'Recent'}</span>
+              </div>
+            </div>
+            <div class="file-actions">
+              <a href="/api/files/${file._id}" target="_blank" rel="noopener" class="btn btn-view">View</a>
+              <button type="button" class="btn btn-delete" onclick="deleteFile('${file._id}')">Delete</button>
+            </div>
+          `;
+          filesList.appendChild(li);
+        });
+      } catch (err) {
+        filesList.innerHTML = '<li class="empty-state empty-state-error">Error loading files from database.</li>';
+      }
+    }
+
+    async function deleteFile(id) {
+      if (!confirm('Are you sure you want to delete this file? This will remove all binary chunks from MongoDB.')) return;
+
+      try {
+        const res = await fetch(`/api/files/${id}`, { method: 'DELETE' });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          loadFiles();
+        } else {
+          alert('Delete failed: ' + data.message);
+        }
+      } catch (err) {
+        alert('Server error while deleting.');
+      }
+    }
+
+    loadFiles();
+  </script>
+</body>
+</html>
